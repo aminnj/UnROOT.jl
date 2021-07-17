@@ -62,7 +62,6 @@ end
 abstract type TAxis <: ROOTStreamedObject end
 struct TAxis_10 <: TAxis end
 function readfields!(io, fields, T::Type{TAxis_10})
-    # overrides things like fName,... that were set from the parent TH1 :(
     stream!(io, fields, TNamed)
     stream!(io, fields, TAttAxis)
     fields[:fNbins] = readtype(io, Int32)
