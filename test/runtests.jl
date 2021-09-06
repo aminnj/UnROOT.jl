@@ -565,12 +565,14 @@ const SAMPLES_DIR = joinpath(@__DIR__, "samples")
         @test sum(event_nums) == length(t)
 
         nmus .= 0
-        # events_processed = [Set{Int}() for _ in Threads.nthreads()]
-        # @batch for (i,evt) in enumerate(t)
+        events_processed = [Vector{Int}() for _ in 1:Threads.nthreads()]
         @batch for evt in t
-            nmus[Threads.threadid()] += length(evt.Muon_pt)
-
+            tid = Threads.threadid()
+            nmus[tid] += length(evt.Muon_pt)
+            i = getfield(evt, :idx)
+            push!(events_processed[tid], i)
         end
+        println(events_processed)
         @show "567", nmus
         @test count(>(0), nmus) > 1 # test @batch is actually threading
         @test sum(nmus) == 878
