@@ -566,6 +566,7 @@ end
         end
         @test count(>(0), nmus) > 1 # test @batch is actually threading
         @test sum(nmus) == 878
+
     end
 
     et = enumerate(t)
