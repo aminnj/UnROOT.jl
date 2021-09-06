@@ -533,6 +533,8 @@ const SAMPLES_DIR = joinpath(@__DIR__, "samples")
 
 
     @static if VERSION > v"1.5.1"
+        println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
+
         nmus = zeros(Int, Threads.nthreads())
         Threads.@threads for (i,evt) in enumerate(t)
             nmus[Threads.threadid()] += length(t.Muon_pt[i])
@@ -550,6 +552,7 @@ const SAMPLES_DIR = joinpath(@__DIR__, "samples")
         @batch for (i,evt) in enumerate(t)
             nmus[Threads.threadid()] += length(evt.Muon_pt)
         end
+        @show "553", nmus
         @test count(>(0), nmus) > 1 # test @batch is actually threading
         @test sum(nmus) == 878
 
@@ -557,6 +560,7 @@ const SAMPLES_DIR = joinpath(@__DIR__, "samples")
         @batch for (i,evt) in enumerate(t)
             event_nums[Threads.threadid()] += 1
         end
+        @show "560", event_nums
         @test count(>(0), event_nums) > 1 # test @batch is actually threading
         @test sum(event_nums) == length(t)
 
@@ -564,6 +568,7 @@ const SAMPLES_DIR = joinpath(@__DIR__, "samples")
         @batch for evt in t
             nmus[Threads.threadid()] += length(evt.Muon_pt)
         end
+        @show "567", nmus
         @test count(>(0), nmus) > 1 # test @batch is actually threading
         @test sum(nmus) == 878
 
