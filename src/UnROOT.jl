@@ -30,5 +30,6 @@ include("root.jl")
 include("iteration.jl")
 include("custom.jl")
 include("displays.jl")
+include("polyester.jl")
 
 end # module
