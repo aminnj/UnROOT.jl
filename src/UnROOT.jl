@@ -12,6 +12,9 @@ using Mixers, Parameters, Memoization, LRUCache
 
 import Tables, TypedTables, PrettyTables, DataFrames
 
+using Polyester
+export @batch
+
 @static if VERSION < v"1.6"
     Base.first(a::AbstractVector{S}, n::Integer) where S<: AbstractString = a[1:(length(a) > n ? n : end)]
     Base.first(a::S, n::Integer) where S<: AbstractString = a[1:(length(a) > n ? n : end)]
