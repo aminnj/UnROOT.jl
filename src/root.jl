@@ -200,10 +200,11 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
     # the jaggedness comes from having "[]" in TLeaf's title
     # the other is where we need to auto detector T bsaed on class name
     # we want the fundamental type as `reinterpret` will create vector
-    if J == Nojagg
-        return ntoh.(reinterpret(T, rawdata))
-    elseif J == Offsetjaggjagg # the branch is doubly jagged
-        jagg_offset = 10
+    dp = length(rawdata)
+    jagg_offset = Int32(10)
+    if J === Nojagg
+        return GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{T}(pointer(rawdata)), dp÷sizeof(T)))
+    elseif J === Offsetjaggjagg # the branch is doubly jagged
         subT = eltype(eltype(T))
         out = VectorOfVectors(T(), Int32[1])
         @views for i in 1:(length(rawoffsets)-1)
@@ -225,33 +226,28 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
         # this is why we need to append `rawoffsets` in the `readbranchraw()` call
         # when you use this range to index `rawdata`, you will get raw bytes belong to each event
         # Say your real data is Int32 and you see 8 bytes after indexing, then this event has [num1, num2] as real data
-        _size = sizeof(eltype(T))
-        if J === Offsetjagg
-            jagg_offset = 10
-            dp = 0 # book keeping for copy_to!
-            lr = length(rawoffsets)
-            offset = Vector{Int32}(undef, lr)
-            offset[1] = 0
-            @views @inbounds for i in 1:lr-1
-                start = rawoffsets[i]+jagg_offset+1
+        _eltype = eltype(T)
+        _size = sizeof(_eltype)
+        z = zero(Int32)
+        o = one(Int32)
+        @inbounds if J === Offsetjagg
+            dp = z # book keeping for copy_to!
+            start = rawoffsets[1]+jagg_offset+o
+            rawoffsets[1] = z
+            @inbounds for i in 1:length(rawoffsets)-1
                 stop = rawoffsets[i+1]
-                l = stop-start+1
-                if l > 0
-                    unsafe_copyto!(rawdata, dp+1, rawdata, start, l)
+                l = stop-start+o
+                if l > z
+                    unsafe_copyto!(rawdata, dp+o, rawdata, start, l)
                     dp += l
-                    offset[i+1] = offset[i] + l
-                else
-                    # when we have an empty [] in jagged basket
-                    offset[i+1] = offset[i]
                 end
+                start = stop+jagg_offset+o
+                rawoffsets[i+1] = dp
             end
-            resize!(rawdata, dp)
-        else
-            offset = rawoffsets
         end
-        real_data = ntoh.(reinterpret(T, rawdata))
-        offset .= (offset .÷ _size) .+ 1
-        return VectorOfVectors(real_data, offset, ArraysOfArrays.no_consistency_checks)
+        @. rawoffsets = rawoffsets ÷ _size + o
+        real_data = GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{_eltype}(pointer(rawdata)), dp÷_size))
+        return VectorOfVectors(real_data, rawoffsets, ArraysOfArrays.no_consistency_checks)
     end
 end
 
