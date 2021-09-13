@@ -12,7 +12,7 @@ struct ROOTFile
     tkey::TKey
     streamers::Streamers
     directory::ROOTDirectory
-    customstructs::Dict{String, Type}
+    customstructs::Dict{String,Type}
     lk::ReentrantLock
 end
 function close(f::ROOTFile)
@@ -56,7 +56,7 @@ test/samples/NanoAODv5_sample.root
    └─ "⋮"
 ```
 """
-function ROOTFile(filename::AbstractString; customstructs = Dict("TLorentzVector" => LorentzVector{Float64}))
+function ROOTFile(filename::AbstractString; customstructs=Dict("TLorentzVector" => LorentzVector{Float64}))
     fobj = Base.open(filename)
     preamble = unpack(fobj, FilePreamble)
     String(preamble.identifier) == "root" || error("Not a ROOT file!")
@@ -124,7 +124,7 @@ end
 
 function Base.getindex(f::ROOTFile, s::AbstractString)
     S = _getindex(f, s)
-    if S isa Union{TBranch, TBranchElement}
+    if S isa Union{TBranch,TBranchElement}
         try # if we can't construct LazyBranch, just give up (maybe due to custom class)
             return LazyBranch(f, S)
         catch
@@ -134,7 +134,7 @@ function Base.getindex(f::ROOTFile, s::AbstractString)
     S
 end
 
-@memoize LRU(maxsize = 2000) function _getindex(f::ROOTFile, s)
+@memoize LRU(maxsize=2000) function _getindex(f::ROOTFile, s)
 # function _getindex(f::ROOTFile, s)
     if '/' ∈ s
         @debug "Splitting path '$s' and getting items recursively"
@@ -151,7 +151,7 @@ end
     catch
     finally
         unlock(f)
-    end
+end
 end
 
 function Base.keys(f::ROOTFile)
@@ -164,7 +164,7 @@ end
 
 Base.keys(t::TTree) = [b.fName for b in t.fBranches.elements]
 
-function Base.getindex(t::T, s::AbstractString) where {T<:Union{TTree, TBranchElement}}
+function Base.getindex(t::T, s::AbstractString) where {T <: Union{TTree,TBranchElement}}
     if '/' ∈ s
         @debug "Splitting path '$s' and getting branches recursively"
         paths = split(s, '/')
@@ -178,11 +178,11 @@ function Base.getindex(t::T, s::AbstractString) where {T<:Union{TTree, TBranchEl
     end
     missing
 end
-function Base.getindex(t::TTree, s::Vector{T}) where {T<:AbstractString}
+function Base.getindex(t::TTree, s::Vector{T}) where {T <: AbstractString}
     [t[n] for n in s]
 end
 
-reinterpret(vt::Type{Vector{T}}, data::AbstractVector{UInt8}) where T <: Union{AbstractFloat, Integer} = reinterpret(T, data)
+reinterpret(vt::Type{Vector{T}}, data::AbstractVector{UInt8}) where T <: Union{AbstractFloat,Integer} = reinterpret(T, data)
 
 """
     interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:JaggType}
@@ -193,7 +193,7 @@ on type `T` and jagg type `J`.
 In order to retrieve data from custom branches, user should defined more speialized
 method of this function with specific `T` and `J`. See `TLorentzVector` example.
 """
-function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:JaggType}
+function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T,J <: JaggType}
     # there are two possibility, one is the leaf is just normal leaf but the title has "[...]" in it
     # magic offsets, seems to be common for a lot of types, see auto.py in uproot3
     # only needs when the jaggedness comes from TLeafElements, not needed when
@@ -203,19 +203,19 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
     dp = length(rawdata)
     jagg_offset = Int32(10)
     if J === Nojagg
-        return GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{T}(pointer(rawdata)), dp÷sizeof(T)))
+        return GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{T}(pointer(rawdata)), dp ÷ sizeof(T)))
     elseif J === Offsetjaggjagg # the branch is doubly jagged
         subT = eltype(eltype(T))
         out = VectorOfVectors(T(), Int32[1])
-        @views for i in 1:(length(rawoffsets)-1)
-            flat = rawdata[(rawoffsets[i]+1+jagg_offset:rawoffsets[i+1])]
+        @views for i in 1:(length(rawoffsets) - 1)
+            flat = rawdata[(rawoffsets[i] + 1 + jagg_offset:rawoffsets[i + 1])]
             row = VectorOfVectors{subT}()
             cursor = 1
             while cursor < length(flat)
-                n = ntoh(reinterpret(Int32, flat[cursor:cursor+sizeof(Int32)-1])[1])
+                n = ntoh(reinterpret(Int32, flat[cursor:cursor + sizeof(Int32) - 1])[1])
                 cursor += sizeof(Int32)
-                b = ntoh.(reinterpret(subT, flat[cursor:cursor+n*sizeof(subT)-1]))
-                cursor += n*sizeof(subT)
+                b = ntoh.(reinterpret(subT, flat[cursor:cursor + n * sizeof(subT) - 1]))
+                cursor += n * sizeof(subT)
                 push!(row, b)
             end
             push!(out, row)
@@ -232,22 +232,27 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
         o = one(Int32)
         @inbounds if J === Offsetjagg
             dp = z # book keeping for copy_to!
-            start = rawoffsets[1]+jagg_offset+o
+            start = rawoffsets[1] + jagg_offset + o
             rawoffsets[1] = z
-            @inbounds for i in 1:length(rawoffsets)-1
-                stop = rawoffsets[i+1]
-                l = stop-start+o
+            @inbounds for i in 1:length(rawoffsets) - 1
+                stop = rawoffsets[i + 1]
+                l = stop - start + o
                 if l > z
-                    unsafe_copyto!(rawdata, dp+o, rawdata, start, l)
+                    unsafe_copyto!(rawdata, dp + o, rawdata, start, l)
                     dp += l
                 end
-                start = stop+jagg_offset+o
-                rawoffsets[i+1] = dp
+                start = stop + jagg_offset + o
+                rawoffsets[i + 1] = dp
             end
         end
         @. rawoffsets = rawoffsets ÷ _size + o
-        real_data = GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{_eltype}(pointer(rawdata)), dp÷_size))
-        return VectorOfVectors(real_data, rawoffsets, ArraysOfArrays.no_consistency_checks)
+        #= real_data = GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{_eltype}(pointer(rawdata)), dp÷_size)) =#
+        GC.@preserve rawdata begin
+            ϖ = convert(Ptr{_eltype}, pointer(rawdata))
+            w = unsafe_wrap(Array, ϖ, dp ÷ _size)
+        end
+        w .= ntoh.(w)
+        return VectorOfVectors(w, rawoffsets, ArraysOfArrays.no_consistency_checks)
     end
 end
 
@@ -269,11 +274,11 @@ const _leaftypeconstlookup = Dict(
                              Const.kInt    => Int32 ,
                              Const.kBits   => UInt32,
                              Const.kUInt   => UInt32,
-                             Const.kCounter=>UInt32 ,
+                             Const.kCounter => UInt32 ,
                              Const.kLong => Int64   ,
                              Const.kLong64 =>  Int64,
                              Const.kULong =>  UInt64,
-                             Const.kULong64 =>UInt64,
+                             Const.kULong64 => UInt64,
                              Const.kDouble32 => Float32,
                              Const.kDouble =>   Float64,
                              Const.kFloat => Float32,
@@ -291,7 +296,7 @@ methods from here on.
 
 See also: [`ROOTFile`](@ref), [`interped_data`](@ref)
 """
-function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
+function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String,Type})
 # TODO Why is this broken on 1.8?
 # @memoize LRU(;maxsize=10^3) function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
     leaf = first(branch.fLeaves.elements)
@@ -319,7 +324,7 @@ function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
         catch
         end
         m = match(r"vector<(.*)>", classname)
-        if m!==nothing
+        if m !== nothing
             elname = m[1]
 
             minner = match(r"vector<(.*)>", elname)
@@ -328,7 +333,7 @@ function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
                 _jaggtype = Offsetjaggjagg
             end
 
-            try
+                try
                 _custom = customstructs[elname]
                 return Vector{_custom}, _jaggtype
             catch
@@ -357,7 +362,7 @@ function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
             _type = get(_leaftypeconstlookup, leaftype, nothing)
             isnothing(_type) && error("Cannot interpret type.")
             if branch.fType == Const.kSubbranchSTLCollection
-                _type = Vector{_type}
+_type = Vector{_type}
             end
         end
     else
@@ -373,10 +378,10 @@ end
 function readbranchraw(f::ROOTFile, branch)
     nbytes = branch.fBasketBytes
     datas = sizehint!(Vector{UInt8}(), sum(nbytes)) # maximum length if all data are UInt8
-    offsets = sizehint!(zeros(Int32, 1), branch.fEntries+1) # this is always Int32
+    offsets = sizehint!(zeros(Int32, 1), branch.fEntries + 1) # this is always Int32
     position = 0
     foreach(branch.fBasketSeek) do seek
-        seek==0 && return
+        seek == 0 && return
         data, offset = readbasketseek(f, branch, seek)
         append!(datas, data)
         # FIXME: assuming offset has always 0 or at least 2 elements ;)
@@ -411,13 +416,13 @@ See also: [`auto_T_JaggT`](@ref), [`basketarray`](@ref)
 """
 readbasket(f::ROOTFile, branch, ith) = readbasketseek(f, branch, branch.fBasketSeek[ith])
 
-function readbasketseek(f::ROOTFile, branch::Union{TBranch, TBranchElement}, seek_pos::Int)
+function readbasketseek(f::ROOTFile, branch::Union{TBranch,TBranchElement}, seek_pos::Int)
     lock(f)
     local basketkey, compressedbytes
     try
         seek(f.fobj, seek_pos)
         basketkey = unpack(f.fobj, TBasketKey)
-        compressedbytes = compressed_datastream(f.fobj, basketkey)
+    compressedbytes = compressed_datastream(f.fobj, basketkey)
     catch
         finally
         unlock(f)
@@ -427,8 +432,8 @@ function readbasketseek(f::ROOTFile, branch::Union{TBranch, TBranchElement}, see
 
     @debug begin
         ibasket = findfirst(==(seek_pos), branch.fBasketSeek)
-        mbcompressed = length(compressedbytes)/1024^2
-        mbuncompressed = length(basketrawbytes)/1024^2
+        mbcompressed = length(compressedbytes) / 1024^2
+        mbuncompressed = length(basketrawbytes) / 1024^2
         "Read branch $(branch.fName), basket $(ibasket), $(mbcompressed) MB compressed, $(mbuncompressed) MB uncompressed"
     end
 
