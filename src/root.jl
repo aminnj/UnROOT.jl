@@ -247,10 +247,8 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T,J <: 
         end
         @. rawoffsets = rawoffsets ÷ _size + o
         #= real_data = GC.@preserve rawdata ntoh.(unsafe_wrap(Array, Ptr{_eltype}(pointer(rawdata)), dp÷_size)) =#
-        GC.@preserve rawdata begin
-            ϖ = convert(Ptr{_eltype}, pointer(rawdata))
-            w = unsafe_wrap(Array, ϖ, dp ÷ _size)
-        end
+        ϖ = convert(Ptr{_eltype}, pointer(rawdata))
+        w = unsafe_wrap(Array, ϖ, dp ÷ _size)
         w .= ntoh.(w)
         return VectorOfVectors(w, rawoffsets, ArraysOfArrays.no_consistency_checks)
     end

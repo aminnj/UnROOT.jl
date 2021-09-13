@@ -46,13 +46,14 @@ by [`interped_data`](@ref) to translate raw bytes into actual data.
 function basketarray(f::ROOTFile, path::AbstractString, ithbasket)
     return basketarray(f, f[path], ithbasket)
 end
-function basketarray(f::ROOTFile, branch, ithbasket)
+function basketarray(f::ROOTFile, branch, ithbasket, _hash::UInt64 = 0)
     ismissing(branch) && error("No branch found at $path")
     length(branch.fLeaves.elements) > 1 && error(
         "Branches with multiple leaves are not supported yet. Try reading with `array(...; raw=true)`.",
     )
 
     rawdata, rawoffsets = readbasket(f, branch, ithbasket)
+    lifesucks[_hash] = Ref(rawdata)
     T, J = auto_T_JaggT(f, branch; customstructs=f.customstructs)
     return interped_data(rawdata, rawoffsets, T, J)
 end
@@ -107,7 +108,6 @@ end
 
 function Base.hash(lb::LazyBranch, h::UInt)
     h = hash(lb.f, h)
-    h = hash(lb.b.fClassName, h)
     h = hash(lb.L, h)
     for br in lb.buffer_range
         h = hash(br, h)
@@ -144,15 +144,15 @@ and update buffer and buffer range accordingly.
     moment, access a `LazyBranch` from different threads at the same time can cause
     performance issue and incorrect event result.
 """
+const lifesucks = Dict{UInt64, Ref}()
+
 function Base.getindex(ba::LazyBranch{T,J,B}, idx::Integer) where {T,J,B}
     tid = Threads.threadid()
     br = ba.buffer_range[tid]
     if idx ∉ br
+        _hash = hash(ba, hash(tid))
         seek_idx = findfirst(x -> x > (idx - 1), ba.fEntry) - 1 #support 1.0 syntax
-        bb = basketarray(ba.f, ba.b, seek_idx)
-        if typeof(bb) !== B
-            error("Expected type of interpreted data: $(B), got: $(typeof(bb))")
-        end
+        bb = basketarray(ba.f, ba.b, seek_idx, _hash)
         ba.buffer[tid] = bb
         br = (ba.fEntry[seek_idx] + 1):(ba.fEntry[seek_idx + 1])
         ba.buffer_range[tid] = br
