@@ -253,7 +253,15 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
         else
             offset = rawoffsets
         end
-        real_data = ntoh.(reinterpret(T, rawdata))
+
+        # real_data = ntoh.(reinterpret(T, rawdata))
+
+        eT = eltype(T)
+        ptr = Ptr{eT}(pointer(rawdata))
+        ref = Ref(rawdata)
+        real_data = MyBlobVector(Blob(ptr, 0, _size), length(rawdata) ÷ _size, ref)
+        real_data .= ntoh.(real_data)
+
         offset .= (offset .÷ _size) .+ 1
         return VectorOfVectors(real_data, offset, ArraysOfArrays.no_consistency_checks)
     end

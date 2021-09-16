@@ -11,6 +11,8 @@ import AbstractTrees: children, printnode, print_tree
 using CodecZlib, CodecLz4, CodecXz, CodecZstd, StaticArrays, LorentzVectors, ArraysOfArrays
 using Mixers, Parameters, Memoization, LRUCache
 
+using Blobs
+
 import Tables, TypedTables, PrettyTables
 
 @static if VERSION < v"1.6"
@@ -18,6 +20,8 @@ import Tables, TypedTables, PrettyTables
     Base.first(a::S, n::Integer) where S<: AbstractString = a[1:(length(a) > n ? n : end)]
 end
 
+
+include("blobs.jl")
 include("constants.jl")
 include("io.jl")
 include("types.jl")
