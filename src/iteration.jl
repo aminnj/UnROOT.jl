@@ -154,7 +154,7 @@ and update buffer and buffer range accordingly.
 function Base.getindex(ba::LazyBranch{T,J,B}, idx::Integer) where {T,J,B}
     tid = Threads.threadid()
     br = @inbounds ba.buffer_range[tid]
-    if unsigned(idx - br.start) > br.stop - br.start
+    if unsigned(idx - br.start) > br.stop - br.start # equivalent to `idx ∉ br`
         seek_idx = findfirst(x -> x > (idx - 1), ba.fEntry) - 1 #support 1.0 syntax
         bb = basketarray(ba.f, ba.b, seek_idx)
         ba.buffer[tid] = bb
@@ -164,6 +164,8 @@ function Base.getindex(ba::LazyBranch{T,J,B}, idx::Integer) where {T,J,B}
     localidx = idx - br.start + 1
     return @inbounds ba.buffer[tid][localidx]
 end
+
+Base.IndexStyle(::Type{<:LazyBranch}) = IndexLinear()
 
 function Base.iterate(ba::LazyBranch{T,J,B}, idx=1) where {T,J,B}
     idx > ba.L && return nothing
