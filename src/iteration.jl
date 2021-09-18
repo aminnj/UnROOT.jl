@@ -109,7 +109,15 @@ mutable struct LazyBranch{T,J,B} <: AbstractVector{T}
     function LazyBranch(f::ROOTFile, b::Union{TBranch,TBranchElement})
         T, J = auto_T_JaggT(f, b; customstructs=f.customstructs)
         T = (T === Vector{Bool} ? BitVector : T)
-        _buffer = J === Nojagg ? T[] : VectorOfVectors(T(), Int32[1])
+        _buffer = J === Nojagg ? begin
+            a = T[]
+            bv = MyBlobVector(Blob(pointer(a)),0,Ref(UInt8[]))
+        end : begin
+            a = T()
+            bv = MyBlobVector(Blob(pointer(a)),0,Ref(UInt8[]))
+            VectorOfVectors(bv, Int32[1])
+        end
+        _buffer = (J === Offsetjaggjagg ? VectorOfVectors(T(), Int32[1]) : _buffer)
         return new{T,J,typeof(_buffer)}(f, b, length(b),
                                         b.fBasketEntry,
                                         [_buffer for _ in 1:Threads.nthreads()],
@@ -179,7 +187,7 @@ function _localindex_newbasket!(ba::LazyBranch{T,J,B}, idx::Integer, tid::Int) w
     return idx - br.start + 1
 end
 
-Base.IndexStyle(::Type{<:LazyBranch}) = IndexCartesian()
+Base.IndexStyle(::Type{<:LazyBranch}) = IndexLinear()
 
 function Base.iterate(ba::LazyBranch{T,J,B}, idx=1) where {T,J,B}
     idx > ba.L && return nothing

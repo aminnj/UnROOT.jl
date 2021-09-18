@@ -200,6 +200,15 @@ end
 
 reinterpret(vt::Type{Vector{T}}, data::AbstractVector{UInt8}) where T <: Union{AbstractFloat, Integer} = reinterpret(T, data)
 
+function ntoh_reinterpret(T, rawdata)
+    eT = eltype(T)
+    _size = sizeof(eT)
+    ptr = Ptr{eT}(pointer(rawdata))
+    real_data = MyBlobVector(Blob(ptr, 0, _size), length(rawdata) ÷ _size, Ref(rawdata))
+    real_data .= ntoh.(real_data)
+    return real_data
+end
+
 """
     interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:JaggType}
 
@@ -221,7 +230,7 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
     # the other is where we need to auto detector T bsaed on class name
     # we want the fundamental type as `reinterpret` will create vector
     if J === Nojagg
-        return ntoh.(reinterpret(T, rawdata))
+        return ntoh_reinterpret(T, rawdata)
     elseif J === Offsetjaggjagg # the branch is doubly jagged
         jagg_offset = 10
         subT = eltype(eltype(T))
@@ -269,7 +278,7 @@ function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:J
         else
             offset = rawoffsets
         end
-        real_data = ntoh.(reinterpret(T, rawdata))
+        real_data = ntoh_reinterpret(T, rawdata)
         offset .= (offset .÷ _size) .+ 1
         return VectorOfVectors(real_data, offset, ArraysOfArrays.no_consistency_checks)
     end
