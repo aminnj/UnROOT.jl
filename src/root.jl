@@ -215,7 +215,6 @@ function interped_data(rawdata, rawoffsets, ::Type{Bool}, ::Type{Nojagg})
 end
 function interped_data(rawdata, rawoffsets, ::Type{Vector{String}}, ::Type{Offsetjagg})
     jagg_offset = 10
-    out = Vector{Vector{String}}()
     offsets = Int32[1]
     offset = 0
     flatstrings = String[]
@@ -224,9 +223,8 @@ function interped_data(rawdata, rawoffsets, ::Type{Vector{String}}, ::Type{Offse
         cursor = 1
         while cursor < length(flat)
             n = Int32(flat[cursor])
-            cursor += 1
-            push!(flatstrings, String(flat[cursor:cursor+n-1]))
-            cursor += n
+            push!(flatstrings, String(flat[cursor+1:cursor+n]))
+            cursor += n+1
             offset += 1
         end
         push!(offsets, offset)
