@@ -213,6 +213,26 @@ function interped_data(rawdata, rawoffsets, ::Type{Bool}, ::Type{Nojagg})
     # specialized case to get Vector{Bool} instead of BitVector
     return map(ntoh,reinterpret(Bool, rawdata))
 end
+function interped_data(rawdata, rawoffsets, ::Type{Vector{String}}, ::Type{Offsetjagg})
+    jagg_offset = 10
+    out = Vector{Vector{String}}()
+    offsets = Int32[1]
+    offset = 0
+    flatstrings = String[]
+    @views for i in 1:(length(rawoffsets)-1)
+        flat = rawdata[(rawoffsets[i]+1+jagg_offset:rawoffsets[i+1])]
+        cursor = 1
+        while cursor < length(flat)
+            n = Int32(flat[cursor])
+            cursor += 1
+            push!(flatstrings, String(flat[cursor:cursor+n-1]))
+            cursor += n
+            offset += 1
+        end
+        push!(offsets, offset)
+    end
+    return VectorOfVectors(flatstrings, offsets, ArraysOfArrays.no_consistency_checks)
+end
 function interped_data(rawdata, rawoffsets, ::Type{T}, ::Type{J}) where {T, J<:JaggType}
     # there are two possibility, one is the leaf is just normal leaf but the title has "[...]" in it
     # magic offsets, seems to be common for a lot of types, see auto.py in uproot3
@@ -373,6 +393,8 @@ function auto_T_JaggT(f::ROOTFile, branch; customstructs::Dict{String, Type})
                     Int64
                 elseif elname == "ulong64"
                     UInt64
+                elseif elname == "string"
+                    String
                 else
                     _type = getfield(Base, Symbol(:C, elname))
                 end
